@@ -833,7 +833,7 @@ class IPAddr
       right = ''
     when RE_IPV6ADDRLIKE_COMPRESSED
       if $4
-        left.count(':') <= 6 or raise InvalidAddressError, "invalid address: #{left}"
+        left.count(':') <= ($1.empty? ? 7 : 6) or raise InvalidAddressError, "invalid address: #{left}"
         addr = in_addr($~[4,4])
         left = $1
         right = $3 + '0:0'
@@ -850,9 +850,6 @@ class IPAddr
     l = left.split(':')
     r = right.split(':')
     rest = 8 - l.size - r.size
-    if rest < 0
-      return nil
-    end
     (l + Array.new(rest, '0') + r).inject(0) { |i, s|
       i << 16 | s.hex
     } | addr
@@ -907,22 +904,11 @@ unless Socket.const_defined? :AF_INET6
     private
 
     def valid_v6?(addr) # :nodoc:
-      case addr
-      when IPAddr::RE_IPV6ADDRLIKE_FULL
-        if $2
-          $~[2,4].all? {|i| i.to_i < 256 }
-        else
-          true
-        end
-      when IPAddr::RE_IPV6ADDRLIKE_COMPRESSED
-        if $4
-          addr.count(':') <= 6 && $~[4,4].all? {|i| i.to_i < 256}
-        else
-          addr.count(':') <= 7
-        end
-      else
-        false
-      end
+      # Share IPAddr's parser so both accept exactly the same addresses.
+      IPAddr.allocate.__send__(:in6_addr, addr)
+      true
+    rescue IPAddr::InvalidAddressError
+      false
     end
 
     alias getaddress_orig getaddress
