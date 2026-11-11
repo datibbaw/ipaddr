@@ -826,4 +826,30 @@ class TC_Operator < Test::Unit::TestCase
     assert_warning("") { assert_equal("2001:db8::", IPAddr.new("[2001:db8::]").to_s) }
     assert_warning("") { assert_equal("2001:db8::", IPAddr.new("2001:db8::/32").to_s) }
   end
+
+  def test_valid_v6_without_af_inet6
+    # JRuby always defines Socket::AF_INET6 and does not allow removing it,
+    # so the fallback IPSocket.valid_v6? is unreachable there.
+    omit "Socket::AF_INET6 cannot be removed on JRuby" if RUBY_ENGINE == "jruby"
+
+    assert_separately(%w[-rsocket], <<~'RUBY')
+      Socket.send(:remove_const, :AF_INET6)
+      require "ipaddr"
+
+      %w[
+        ::1 :: 1:2:3:4:5:6:7:8 ::1:2:3:4:5:6:7 1:2:3:4:5:6:7::
+        ::ffff:1.2.3.4 1:2:3:4:5:6:1.2.3.4 ::1:2:3:4:5:1.2.3.4 1::2:3:4:5:1.2.3.4
+      ].each do |addr|
+        assert_send([IPSocket, :valid_v6?, addr], addr)
+      end
+
+      %w[
+        1:2:3:4:5:6:7:8:9 ::1:2:3:4:5:6:7:8 1:2:3:4:5:6:7:8::
+        ::1:2:3:4:5:6:1.2.3.4 1:2:3:4:5:6::1.2.3.4 ::1.2.3.256 ::1.2.3.04
+        1.2.3.4 localhost
+      ].each do |addr|
+        assert_not_send([IPSocket, :valid_v6?, addr], addr)
+      end
+    RUBY
+  end
 end

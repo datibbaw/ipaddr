@@ -904,22 +904,11 @@ unless Socket.const_defined? :AF_INET6
     private
 
     def valid_v6?(addr) # :nodoc:
-      case addr
-      when IPAddr::RE_IPV6ADDRLIKE_FULL
-        if $2
-          $~[2,4].all? {|i| i.to_i < 256 }
-        else
-          true
-        end
-      when IPAddr::RE_IPV6ADDRLIKE_COMPRESSED
-        if $4
-          addr.count(':') <= 6 && $~[4,4].all? {|i| i.to_i < 256}
-        else
-          addr.count(':') <= 7
-        end
-      else
-        false
-      end
+      # Share IPAddr's parser so both accept exactly the same addresses.
+      IPAddr.allocate.__send__(:in6_addr, addr)
+      true
+    rescue IPAddr::InvalidAddressError
+      false
     end
 
     alias getaddress_orig getaddress
